@@ -6,7 +6,7 @@ const ANTHROPIC_VERSION: &str = "2023-06-01";
 const MODEL: &str = "claude-opus-4-6";
 const MAX_TOKENS: u32 = 1024;
 
-const SYSTEM_PROMPT: &str = "\
+pub const SYSTEM_PROMPT: &str = "\
 You are a bash command generator. Given a natural language description of a task, \
 output ONLY the bash command or script needed to accomplish it. \
 Rules:

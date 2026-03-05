@@ -1,4 +1,5 @@
 mod claude;
+mod claude_cli;
 
 use anyhow::Result;
 use clap::Parser;
@@ -64,7 +65,7 @@ async fn run() -> Result<()> {
 
     eprintln!("Asking Claude how to: {description}");
 
-    let command = claude::generate_command(&description).await?;
+    let command = generate_command_with_fallback(&description).await?;
     let risk_assessment = classify_risk(&command);
     let policy_action = decide_policy(mode, risk_assessment.level);
 
@@ -96,6 +97,18 @@ async fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn generate_command_with_fallback(description: &str) -> Result<String> {
+    if claude_cli::is_claude_cli_available() {
+        eprintln!("(using claude CLI)");
+        match claude_cli::generate_command_via_cli(description) {
+            Ok(command) => return Ok(command),
+            Err(err) => eprintln!("claude CLI failed: {err:#}, falling back to HTTP API"),
+        }
+    }
+
+    claude::generate_command(description).await
 }
 
 fn execution_mode_from_args(args: &Args) -> ExecutionMode {

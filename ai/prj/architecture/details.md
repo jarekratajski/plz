@@ -7,7 +7,9 @@ plz/
 ├── Cargo.toml       — dependencies and project config
 ├── src/
 │   ├── main.rs      — CLI entry point, confirmation, command execution
-│   └── claude.rs    — Claude API client
+│   ├── claude.rs    — Claude HTTP API client
+│   ├── claude_cli.rs— Claude CLI backend (preferred when available)
+│   └── safety.rs    — Risk assessment and policy logic
 ├── plan.md          — implementation plan
 ├── details.md       — this file
 └── goal.md          — original requirements
@@ -33,6 +35,14 @@ to avoid a hard dependency on OpenSSL system libraries.
 - **Auth:** `x-api-key` header from `ANTHROPIC_API_KEY` env var
 - **System prompt:** Instructs Claude to output only raw bash commands, no markdown, no explanations
 - **Parsing:** Extracts the first `"text"` content block from the response
+
+## Claude CLI Backend (`src/claude_cli.rs`)
+
+- **Detection:** checks if `claude` executable is in `$PATH` via `which claude`
+- **Invocation:** runs `claude -p "<prompt>" --output-format text` as a subprocess
+- **Prompt:** reuses the same `SYSTEM_PROMPT` from `claude.rs` with the user description appended
+- **Fallback:** if CLI is unavailable or fails, falls back to the HTTP API automatically
+- **Error truncation:** CLI stderr is truncated to 512 bytes for error messages
 
 ## CLI Flow (`src/main.rs`)
 
