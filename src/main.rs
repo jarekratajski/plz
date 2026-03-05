@@ -1,5 +1,5 @@
-mod claude;
-mod claude_cli;
+mod vendor;
+mod vendors;
 
 use anyhow::Result;
 use clap::Parser;
@@ -11,18 +11,22 @@ use std::process;
 #[command(name = "plz", about = "Turn natural language into shell commands",
     after_help = "\
 CONFIGURATION:
-  plz uses Claude to generate commands. Two backends are supported:
+  plz auto-detects available AI backends in this order:
 
-  1. Claude CLI (preferred)
+  1. Claude CLI (preferred — no API key needed)
      Install from: https://docs.anthropic.com/en/docs/claude-cli
-     If 'claude' is in your $PATH it will be used automatically.
-     No API key needed — the CLI handles authentication.
+     If 'claude' is in your $PATH it is used automatically.
 
-  2. HTTP API (fallback)
-     Get an API key at: https://console.anthropic.com/
-     Then set it in your shell:
+  2. Claude HTTP API
+     Get a key at: https://console.anthropic.com/
        export ANTHROPIC_API_KEY=\"sk-ant-...\"
-     Add the export to ~/.bashrc or ~/.zshrc for persistence."
+
+  3. OpenAI (ChatGPT) HTTP API
+     Get a key at: https://platform.openai.com/api-keys
+       export OPENAI_API_KEY=\"sk-...\"
+
+  Add exports to ~/.bashrc or ~/.zshrc for persistence.
+  The first available backend is used; others serve as fallbacks."
 )]
 struct Args {
     /// Safe mode: only safe commands can run
@@ -82,9 +86,9 @@ async fn run() -> Result<()> {
     let description = args.description.join(" ");
     let mode = execution_mode_from_args(&args);
 
-    eprintln!("Asking Claude how to: {description}");
+    eprintln!("Asking AI how to: {description}");
 
-    let command = generate_command_with_fallback(&description, args.verbose).await?;
+    let command = vendor::generate_command_with_fallback(&description, args.verbose).await?;
     let risk_assessment = classify_risk(&command);
     let policy_action = decide_policy(mode, risk_assessment.level);
 
@@ -116,26 +120,6 @@ async fn run() -> Result<()> {
     }
 
     Ok(())
-}
-
-async fn generate_command_with_fallback(description: &str, verbose: bool) -> Result<String> {
-    if claude_cli::is_claude_cli_available() {
-        if verbose {
-            eprintln!("Using claude CLI");
-        }
-        match claude_cli::generate_command_via_cli(description) {
-            Ok(command) => return Ok(command),
-            Err(err) => {
-                if verbose {
-                    eprintln!("claude CLI failed: {err:#}, falling back to HTTP API");
-                }
-            }
-        }
-    } else if verbose {
-        eprintln!("claude CLI not found, using HTTP API");
-    }
-
-    claude::generate_command(description).await
 }
 
 fn execution_mode_from_args(args: &Args) -> ExecutionMode {

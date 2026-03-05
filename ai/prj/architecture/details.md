@@ -4,15 +4,19 @@
 
 ```
 plz/
-├── Cargo.toml       — dependencies and project config
+├── Cargo.toml         — dependencies and project config
 ├── src/
-│   ├── main.rs      — CLI entry point, confirmation, command execution
-│   ├── claude.rs    — Claude HTTP API client
-│   ├── claude_cli.rs— Claude CLI backend (preferred when available)
-│   └── safety.rs    — Risk assessment and policy logic
-├── plan.md          — implementation plan
-├── details.md       — this file
-└── goal.md          — original requirements
+│   ├── main.rs        — CLI entry point, confirmation, command execution
+│   ├── vendor.rs      — CommandGenerator trait, auto-detection, fallback chain
+│   ├── vendors/
+│   │   ├── mod.rs     — re-exports vendor modules
+│   │   ├── claude_cli.rs  — Claude CLI backend (highest priority)
+│   │   ├── claude_api.rs  — Claude HTTP API backend
+│   │   └── openai_api.rs  — OpenAI (ChatGPT) HTTP API backend
+│   └── safety.rs      — Risk assessment and policy logic
+├── plan.md            — implementation plan
+├── details.md         — this file
+└── goal.md            — original requirements
 ```
 
 ## Dependencies
@@ -28,27 +32,39 @@ plz/
 **Note:** `reqwest` is configured with `default-features = false, features = ["json", "rustls-tls"]`
 to avoid a hard dependency on OpenSSL system libraries.
 
-## Claude API Integration (`src/claude.rs`)
+## Vendor Abstraction (`src/vendor.rs`)
+
+- **Trait:** `CommandGenerator` with `name()`, `is_available()`, `generate_command()`
+- **Object-safe wrapper:** `CommandGeneratorBoxed` enables dyn dispatch with async
+- **Auto-detection:** `select_vendors()` returns vendors in priority order
+- **Fallback chain:** `generate_command_with_fallback()` tries each available vendor in order
+- **Shared prompt:** `SYSTEM_PROMPT` lives in `vendor.rs`, used by all backends
+
+## Vendor: Claude CLI (`src/vendors/claude_cli.rs`) — Priority 1
+
+- **Detection:** `which claude` in `$PATH`
+- **Invocation:** `claude -p "<prompt>" --output-format text`
+- **Error truncation:** stderr capped at 512 bytes
+
+## Vendor: Claude HTTP API (`src/vendors/claude_api.rs`) — Priority 2
 
 - **Model:** `claude-opus-4-6`
 - **Endpoint:** `POST https://api.anthropic.com/v1/messages`
 - **Auth:** `x-api-key` header from `ANTHROPIC_API_KEY` env var
-- **System prompt:** Instructs Claude to output only raw bash commands, no markdown, no explanations
-- **Parsing:** Extracts the first `"text"` content block from the response
+- **Parsing:** extracts first `"text"` content block
 
-## Claude CLI Backend (`src/claude_cli.rs`)
+## Vendor: OpenAI HTTP API (`src/vendors/openai_api.rs`) — Priority 3
 
-- **Detection:** checks if `claude` executable is in `$PATH` via `which claude`
-- **Invocation:** runs `claude -p "<prompt>" --output-format text` as a subprocess
-- **Prompt:** reuses the same `SYSTEM_PROMPT` from `claude.rs` with the user description appended
-- **Fallback:** if CLI is unavailable or fails, falls back to the HTTP API automatically
-- **Error truncation:** CLI stderr is truncated to 512 bytes for error messages
+- **Model:** `gpt-4o`
+- **Endpoint:** `POST https://api.openai.com/v1/chat/completions`
+- **Auth:** `Authorization: Bearer $OPENAI_API_KEY`
+- **Parsing:** extracts `choices[0].message.content`
 
 ## CLI Flow (`src/main.rs`)
 
 1. `clap` collects all positional arguments with `trailing_var_arg = true`
 2. They are joined with spaces into the natural language description
-3. Claude API is called asynchronously
+3. First available vendor is called via the fallback chain
 4. The proposed command is printed clearly
 5. User is prompted `Execute? [y/N]:` — defaults to **No** on empty input
 6. If confirmed, command runs via `sh -c <command>` with inherited stdio
