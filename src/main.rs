@@ -18,6 +18,10 @@ struct Args {
     #[arg(short = 'f', conflicts_with = "safe")]
     force: bool,
 
+    /// Verbose mode: report which backend is used and other diagnostics
+    #[arg(short = 'v', long = "verbose")]
+    verbose: bool,
+
     /// Natural language description of what to do
     #[arg(required = true, trailing_var_arg = true)]
     description: Vec<String>,
@@ -65,7 +69,7 @@ async fn run() -> Result<()> {
 
     eprintln!("Asking Claude how to: {description}");
 
-    let command = generate_command_with_fallback(&description).await?;
+    let command = generate_command_with_fallback(&description, args.verbose).await?;
     let risk_assessment = classify_risk(&command);
     let policy_action = decide_policy(mode, risk_assessment.level);
 
@@ -99,13 +103,21 @@ async fn run() -> Result<()> {
     Ok(())
 }
 
-async fn generate_command_with_fallback(description: &str) -> Result<String> {
+async fn generate_command_with_fallback(description: &str, verbose: bool) -> Result<String> {
     if claude_cli::is_claude_cli_available() {
-        eprintln!("(using claude CLI)");
+        if verbose {
+            eprintln!("Using claude CLI");
+        }
         match claude_cli::generate_command_via_cli(description) {
             Ok(command) => return Ok(command),
-            Err(err) => eprintln!("claude CLI failed: {err:#}, falling back to HTTP API"),
+            Err(err) => {
+                if verbose {
+                    eprintln!("claude CLI failed: {err:#}, falling back to HTTP API");
+                }
+            }
         }
+    } else if verbose {
+        eprintln!("claude CLI not found, using HTTP API");
     }
 
     claude::generate_command(description).await
