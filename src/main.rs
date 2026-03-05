@@ -8,7 +8,22 @@ use std::process;
 
 /// plz — run natural language commands in your shell
 #[derive(Parser)]
-#[command(name = "plz", about = "Turn natural language into shell commands")]
+#[command(name = "plz", about = "Turn natural language into shell commands",
+    after_help = "\
+CONFIGURATION:
+  plz uses Claude to generate commands. Two backends are supported:
+
+  1. Claude CLI (preferred)
+     Install from: https://docs.anthropic.com/en/docs/claude-cli
+     If 'claude' is in your $PATH it will be used automatically.
+     No API key needed — the CLI handles authentication.
+
+  2. HTTP API (fallback)
+     Get an API key at: https://console.anthropic.com/
+     Then set it in your shell:
+       export ANTHROPIC_API_KEY=\"sk-ant-...\"
+     Add the export to ~/.bashrc or ~/.zshrc for persistence."
+)]
 struct Args {
     /// Safe mode: only safe commands can run
     #[arg(short = 's', conflicts_with = "force")]
