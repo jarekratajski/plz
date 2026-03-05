@@ -12,6 +12,7 @@ Rules:
 
 pub trait CommandGenerator: Send + Sync {
     fn name(&self) -> &str;
+    fn vendor_id(&self) -> &str;
     fn is_available(&self) -> bool;
     fn generate_command(&self, description: &str) -> impl std::future::Future<Output = Result<String>> + Send;
 }
@@ -27,6 +28,7 @@ pub fn select_vendors() -> Vec<Box<dyn CommandGeneratorBoxed>> {
 /// Object-safe version of CommandGenerator for use with dyn dispatch.
 pub trait CommandGeneratorBoxed: Send + Sync {
     fn name(&self) -> &str;
+    fn vendor_id(&self) -> &str;
     fn is_available(&self) -> bool;
     fn generate_command_boxed<'a>(&'a self, description: &'a str) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>>;
 }
@@ -34,6 +36,10 @@ pub trait CommandGeneratorBoxed: Send + Sync {
 impl<T: CommandGenerator> CommandGeneratorBoxed for T {
     fn name(&self) -> &str {
         CommandGenerator::name(self)
+    }
+
+    fn vendor_id(&self) -> &str {
+        CommandGenerator::vendor_id(self)
     }
 
     fn is_available(&self) -> bool {
@@ -45,7 +51,35 @@ impl<T: CommandGenerator> CommandGeneratorBoxed for T {
     }
 }
 
-pub async fn generate_command_with_fallback(description: &str, verbose: bool) -> Result<String> {
+pub async fn generate_command(description: &str, verbose: bool, forced_vendor: Option<&str>) -> Result<String> {
+    if let Some(vendor_id) = forced_vendor {
+        return generate_command_forced(description, verbose, vendor_id).await;
+    }
+    generate_command_with_fallback(description, verbose).await
+}
+
+async fn generate_command_forced(description: &str, verbose: bool, vendor_id: &str) -> Result<String> {
+    let vendors = select_vendors();
+    let vendor = vendors
+        .iter()
+        .find(|v| v.vendor_id() == vendor_id)
+        .ok_or_else(|| anyhow::anyhow!("Unknown vendor: {vendor_id}"))?;
+
+    if verbose {
+        eprintln!("Vendor forced: {}", vendor.name());
+    }
+
+    if !vendor.is_available() {
+        return Err(anyhow::anyhow!(
+            "{} is not available. Run plz --help for setup instructions.",
+            vendor.name()
+        ));
+    }
+
+    vendor.generate_command_boxed(description).await
+}
+
+async fn generate_command_with_fallback(description: &str, verbose: bool) -> Result<String> {
     let vendors = select_vendors();
     let mut last_error = None;
 

@@ -52,6 +52,10 @@ impl CommandGenerator for OpenAiApi {
         "OpenAI HTTP API"
     }
 
+    fn vendor_id(&self) -> &str {
+        "chatgpt"
+    }
+
     fn is_available(&self) -> bool {
         std::env::var("OPENAI_API_KEY").is_ok()
     }

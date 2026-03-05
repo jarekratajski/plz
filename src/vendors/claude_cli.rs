@@ -10,6 +10,10 @@ impl CommandGenerator for ClaudeCli {
         "Claude CLI"
     }
 
+    fn vendor_id(&self) -> &str {
+        "claude-cli"
+    }
+
     fn is_available(&self) -> bool {
         Command::new("which")
             .arg("claude")

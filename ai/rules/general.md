@@ -15,6 +15,8 @@ in folder there is a file req_XYZ.md or td_XYZ.md which contains what has to be 
 there can be a file plan.md (maintained by ai agent - you) which containt implementation plan for the feature (or tech debt) (keep it short and clear)
 if the feature is done there is a report.md file which contains final report (was feature done fully, what problems there were) (keep it short and clear)
 
+IMPORTANT: plan.md is a REQUIRED step for every feature. Always create plan.md before starting implementation. Never skip it.
+
 
 # Work loop
 Ensure you understand code.md

@@ -26,7 +26,12 @@ CONFIGURATION:
        export OPENAI_API_KEY=\"sk-...\"
 
   Add exports to ~/.bashrc or ~/.zshrc for persistence.
-  The first available backend is used; others serve as fallbacks."
+  The first available backend is used; others serve as fallbacks.
+
+  Use --vendor <NAME> to force a specific backend:
+    --vendor claude-cli   Claude CLI subprocess
+    --vendor claude       Claude HTTP API
+    --vendor chatgpt      OpenAI HTTP API"
 )]
 struct Args {
     /// Safe mode: only safe commands can run
@@ -40,6 +45,10 @@ struct Args {
     /// Verbose mode: report which backend is used and other diagnostics
     #[arg(short = 'v', long = "verbose")]
     verbose: bool,
+
+    /// Force a specific vendor instead of auto-detection
+    #[arg(long = "vendor", value_parser = ["claude-cli", "claude", "chatgpt"])]
+    vendor: Option<String>,
 
     /// Natural language description of what to do
     #[arg(required = true, trailing_var_arg = true)]
@@ -88,7 +97,7 @@ async fn run() -> Result<()> {
 
     eprintln!("Asking AI how to: {description}");
 
-    let command = vendor::generate_command_with_fallback(&description, args.verbose).await?;
+    let command = vendor::generate_command(&description, args.verbose, args.vendor.as_deref()).await?;
     let risk_assessment = classify_risk(&command);
     let policy_action = decide_policy(mode, risk_assessment.level);
 

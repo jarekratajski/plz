@@ -51,6 +51,10 @@ impl CommandGenerator for ClaudeApi {
         "Claude HTTP API"
     }
 
+    fn vendor_id(&self) -> &str {
+        "claude"
+    }
+
     fn is_available(&self) -> bool {
         std::env::var("ANTHROPIC_API_KEY").is_ok()
     }
