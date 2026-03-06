@@ -19,8 +19,7 @@ impl CommandGenerator for ClaudeCli {
         Command::new("which")
             .arg("claude")
             .output()
-            .map(|output| output.status.success())
-            .unwrap_or(false)
+            .is_ok_and(|output| output.status.success())
     }
 
     async fn generate_command(&self, description: &str, verbose: bool, no_context: bool) -> Result<String> {

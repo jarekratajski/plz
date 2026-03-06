@@ -97,7 +97,7 @@ impl CommandGenerator for ClaudeApi {
 
         if !status.is_success() {
             let api_err: ApiError = serde_json::from_str(&body)
-                .unwrap_or(ApiError {
+                .unwrap_or_else(|_| ApiError {
                     error: ApiErrorDetail {
                         message: body.clone(),
                     },

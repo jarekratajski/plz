@@ -58,8 +58,7 @@ impl CommandGenerator for CopilotEnterprise {
 
     fn is_available(&self) -> bool {
         std::env::var("GITHUB_TOKEN")
-            .map(|v| !v.is_empty())
-            .unwrap_or(false)
+            .is_ok_and(|v| !v.is_empty())
     }
 
     async fn generate_command(&self, description: &str, verbose: bool, _no_context: bool) -> Result<String> {
@@ -103,7 +102,7 @@ impl CommandGenerator for CopilotEnterprise {
 
         if !status.is_success() {
             let api_err: ApiError = serde_json::from_str(&body)
-                .unwrap_or(ApiError {
+                .unwrap_or_else(|_| ApiError {
                     error: ApiErrorDetail {
                         message: body.clone(),
                     },
