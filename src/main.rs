@@ -1,3 +1,4 @@
+mod session;
 mod vendor;
 mod vendors;
 
@@ -36,7 +37,13 @@ CONFIGURATION:
     --vendor claude-cli   Claude CLI subprocess
     --vendor claude       Claude HTTP API
     --vendor chatgpt      OpenAI HTTP API
-    --vendor copilot      GitHub Copilot Enterprise"
+    --vendor copilot      GitHub Copilot Enterprise
+
+CONVERSATION HISTORY:
+  When using Claude CLI, plz maintains conversation history so follow-up
+  commands can reference previous interactions (e.g. 'do the same for python').
+  History is session-based and expires after 1 hour of inactivity.
+  Use -nc / --no-context to run a one-shot command without history."
 )]
 struct Args {
     /// Safe mode: only safe commands can run
@@ -54,6 +61,10 @@ struct Args {
     /// Force a specific vendor instead of auto-detection
     #[arg(long = "vendor", value_parser = ["claude-cli", "claude", "chatgpt", "copilot"])]
     vendor: Option<String>,
+
+    /// Disable conversation history for this invocation (Claude CLI only)
+    #[arg(long = "no-context", short = 'n')]
+    no_context: bool,
 
     /// Natural language description of what to do
     #[arg(required = true, trailing_var_arg = true)]
@@ -102,7 +113,7 @@ async fn run() -> Result<()> {
 
     eprintln!("Asking AI how to: {description}");
 
-    let command = vendor::generate_command(&description, args.verbose, args.vendor.as_deref()).await?;
+    let command = vendor::generate_command(&description, args.verbose, args.vendor.as_deref(), args.no_context).await?;
     let risk_assessment = classify_risk(&command);
     let policy_action = decide_policy(mode, risk_assessment.level);
 
@@ -112,6 +123,7 @@ async fn run() -> Result<()> {
     match policy_action {
         PolicyAction::Execute => {
             let exit_status = execute_command(&command)?;
+            session::update_execution_result(true, exit_status.code());
             if !exit_status.success() {
                 process::exit(exit_status.code().unwrap_or(1));
             }
@@ -123,6 +135,7 @@ async fn run() -> Result<()> {
             }
 
             let exit_status = execute_command(&command)?;
+            session::update_execution_result(true, exit_status.code());
             if !exit_status.success() {
                 process::exit(exit_status.code().unwrap_or(1));
             }

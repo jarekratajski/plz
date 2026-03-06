@@ -80,9 +80,31 @@ plz compress this folder into a tar.gz
 | `-f` | **Force mode** — Safe and Moderate commands run automatically; Dangerous asks for confirmation |
 | `-v`, `--verbose` | Print which AI backend is being used and other diagnostics |
 | `--vendor <NAME>` | Force a specific backend: `claude-cli`, `claude`, `chatgpt`, or `copilot` |
+| `-n`, `--no-context` | Disable conversation history for this invocation (Claude CLI only) |
 | `-h`, `--help` | Show help with configuration instructions |
 
 `-s` and `-f` are mutually exclusive.
+
+## Conversation history
+
+When using the **Claude CLI** backend, `plz` maintains conversation history
+across invocations. This lets you write follow-up commands naturally:
+
+```bash
+plz find all TODO comments in rust files
+plz now do the same but for python
+plz count how many there were total
+```
+
+History is session-based and expires after 1 hour of inactivity. To run a
+one-shot command without history context:
+
+```bash
+plz -n list files
+```
+
+Conversation history is only available with Claude CLI. Other backends
+(Claude API, OpenAI, Copilot Enterprise) operate statelessly.
 
 ## Safety system
 

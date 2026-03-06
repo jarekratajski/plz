@@ -62,7 +62,7 @@ impl CommandGenerator for CopilotEnterprise {
             .unwrap_or(false)
     }
 
-    async fn generate_command(&self, description: &str, verbose: bool) -> Result<String> {
+    async fn generate_command(&self, description: &str, verbose: bool, _no_context: bool) -> Result<String> {
         let token = std::env::var("GITHUB_TOKEN")
             .context("GITHUB_TOKEN environment variable not set")?;
 

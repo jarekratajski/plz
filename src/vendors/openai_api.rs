@@ -60,7 +60,7 @@ impl CommandGenerator for OpenAiApi {
         std::env::var("OPENAI_API_KEY").is_ok()
     }
 
-    async fn generate_command(&self, description: &str, verbose: bool) -> Result<String> {
+    async fn generate_command(&self, description: &str, verbose: bool, _no_context: bool) -> Result<String> {
         let api_key = std::env::var("OPENAI_API_KEY")
             .context("OPENAI_API_KEY environment variable not set")?;
 

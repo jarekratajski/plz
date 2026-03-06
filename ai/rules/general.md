@@ -43,13 +43,19 @@ If it is feature:
 - start implementing in steps
 - try to keep code compiling after each step (if reasonable)
 - after the feature is implemented ensure there are tests for the feature, code must compile, tests must pass
+- write report.md at the end
 
 If tech-debt is to be implemented:
 
-- Just do it and write report
+- Just do it and write report.md
 - Always ensure that code compiles and tests are passing
 - If you see that tech-debt is a generic rule:
   - add section with rule to code.md, check if it is possible to add linter or other tool to build to prevent similar tech-debt in the future
 
 
 
+# Requirements
+When you are asked to create a req:
+- only create requirement file, 
+- do not change existing requirement files - especially when features are done,
+- you may create more requirements file per feature, if that seems reasonable (separate problems, bigger tasks)

@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use std::process::Command;
 
+use crate::session;
 use crate::vendor::{CommandGenerator, SYSTEM_PROMPT};
 
 pub struct ClaudeCli;
@@ -22,8 +23,42 @@ impl CommandGenerator for ClaudeCli {
             .unwrap_or(false)
     }
 
-    async fn generate_command(&self, description: &str, verbose: bool) -> Result<String> {
-        let prompt = format!("{SYSTEM_PROMPT}\n\n{description}");
+    async fn generate_command(&self, description: &str, verbose: bool, no_context: bool) -> Result<String> {
+        let (prompt, session, is_new_session) = if no_context {
+            if verbose {
+                eprintln!("No-context mode: skipping session");
+            }
+            (format!("{SYSTEM_PROMPT}\n\n{description}"), None, false)
+        } else {
+            match session::load_session() {
+                Some(existing) => {
+                    if verbose {
+                        eprintln!("Resuming session: {}", existing.session_id);
+                    }
+                    let context = existing
+                        .last_interaction
+                        .as_ref()
+                        .map(session::context_prefix)
+                        .unwrap_or_default();
+                    (
+                        format!("{SYSTEM_PROMPT}\n\n{context}{description}"),
+                        Some(existing),
+                        false,
+                    )
+                }
+                None => {
+                    let new_session = session::new_session();
+                    if verbose {
+                        eprintln!("Starting new session: {}", new_session.session_id);
+                    }
+                    (
+                        format!("{SYSTEM_PROMPT}\n\n{description}"),
+                        Some(new_session),
+                        true,
+                    )
+                }
+            }
+        };
 
         if verbose {
             eprintln!("--- Request body ---");
@@ -31,13 +66,23 @@ impl CommandGenerator for ClaudeCli {
             eprintln!("--------------------");
         }
 
-        let output = Command::new("claude")
-            .arg("-p")
+        let mut cmd = Command::new("claude");
+        cmd.arg("-p")
             .arg(&prompt)
             .arg("--output-format")
-            .arg("text")
-            .output()
-            .context("Failed to execute claude CLI")?;
+            .arg("text");
+
+        if let Some(ref s) = session {
+            if is_new_session {
+                cmd.arg("--session-id").arg(&s.session_id);
+            } else {
+                cmd.arg("--resume").arg(&s.session_id);
+            }
+        } else {
+            cmd.arg("--no-session-persistence");
+        }
+
+        let output = cmd.output().context("Failed to execute claude CLI")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -55,6 +100,20 @@ impl CommandGenerator for ClaudeCli {
         let trimmed = command.trim().to_string();
         if trimmed.is_empty() {
             return Err(anyhow!("claude CLI returned empty output"));
+        }
+
+        if let Some(mut s) = session {
+            s.last_used = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            s.last_interaction = Some(session::Interaction {
+                description: description.to_string(),
+                command: trimmed.clone(),
+                executed: false,
+                exit_code: None,
+            });
+            let _ = session::save_session(&s);
         }
 
         Ok(trimmed)

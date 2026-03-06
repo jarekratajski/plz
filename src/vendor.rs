@@ -14,7 +14,7 @@ pub trait CommandGenerator: Send + Sync {
     fn name(&self) -> &str;
     fn vendor_id(&self) -> &str;
     fn is_available(&self) -> bool;
-    fn generate_command(&self, description: &str, verbose: bool) -> impl std::future::Future<Output = Result<String>> + Send;
+    fn generate_command(&self, description: &str, verbose: bool, no_context: bool) -> impl std::future::Future<Output = Result<String>> + Send;
 }
 
 pub fn select_vendors() -> Vec<Box<dyn CommandGeneratorBoxed>> {
@@ -31,7 +31,7 @@ pub trait CommandGeneratorBoxed: Send + Sync {
     fn name(&self) -> &str;
     fn vendor_id(&self) -> &str;
     fn is_available(&self) -> bool;
-    fn generate_command_boxed<'a>(&'a self, description: &'a str, verbose: bool) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>>;
+    fn generate_command_boxed<'a>(&'a self, description: &'a str, verbose: bool, no_context: bool) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>>;
 }
 
 impl<T: CommandGenerator> CommandGeneratorBoxed for T {
@@ -47,19 +47,19 @@ impl<T: CommandGenerator> CommandGeneratorBoxed for T {
         CommandGenerator::is_available(self)
     }
 
-    fn generate_command_boxed<'a>(&'a self, description: &'a str, verbose: bool) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>> {
-        Box::pin(CommandGenerator::generate_command(self, description, verbose))
+    fn generate_command_boxed<'a>(&'a self, description: &'a str, verbose: bool, no_context: bool) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>> {
+        Box::pin(CommandGenerator::generate_command(self, description, verbose, no_context))
     }
 }
 
-pub async fn generate_command(description: &str, verbose: bool, forced_vendor: Option<&str>) -> Result<String> {
+pub async fn generate_command(description: &str, verbose: bool, forced_vendor: Option<&str>, no_context: bool) -> Result<String> {
     if let Some(vendor_id) = forced_vendor {
-        return generate_command_forced(description, verbose, vendor_id).await;
+        return generate_command_forced(description, verbose, vendor_id, no_context).await;
     }
-    generate_command_with_fallback(description, verbose).await
+    generate_command_with_fallback(description, verbose, no_context).await
 }
 
-async fn generate_command_forced(description: &str, verbose: bool, vendor_id: &str) -> Result<String> {
+async fn generate_command_forced(description: &str, verbose: bool, vendor_id: &str, no_context: bool) -> Result<String> {
     let vendors = select_vendors();
     let vendor = vendors
         .iter()
@@ -77,10 +77,10 @@ async fn generate_command_forced(description: &str, verbose: bool, vendor_id: &s
         ));
     }
 
-    vendor.generate_command_boxed(description, verbose).await
+    vendor.generate_command_boxed(description, verbose, no_context).await
 }
 
-async fn generate_command_with_fallback(description: &str, verbose: bool) -> Result<String> {
+async fn generate_command_with_fallback(description: &str, verbose: bool, no_context: bool) -> Result<String> {
     let vendors = select_vendors();
     let mut last_error = None;
 
@@ -96,7 +96,7 @@ async fn generate_command_with_fallback(description: &str, verbose: bool) -> Res
             eprintln!("Using {}", vendor.name());
         }
 
-        match vendor.generate_command_boxed(description, verbose).await {
+        match vendor.generate_command_boxed(description, verbose, no_context).await {
             Ok(command) => return Ok(command),
             Err(err) => {
                 if verbose {
