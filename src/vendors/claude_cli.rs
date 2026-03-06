@@ -22,8 +22,14 @@ impl CommandGenerator for ClaudeCli {
             .unwrap_or(false)
     }
 
-    async fn generate_command(&self, description: &str) -> Result<String> {
+    async fn generate_command(&self, description: &str, verbose: bool) -> Result<String> {
         let prompt = format!("{SYSTEM_PROMPT}\n\n{description}");
+
+        if verbose {
+            eprintln!("--- Request body ---");
+            eprintln!("{prompt}");
+            eprintln!("--------------------");
+        }
 
         let output = Command::new("claude")
             .arg("-p")

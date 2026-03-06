@@ -60,7 +60,7 @@ impl CommandGenerator for OpenAiApi {
         std::env::var("OPENAI_API_KEY").is_ok()
     }
 
-    async fn generate_command(&self, description: &str) -> Result<String> {
+    async fn generate_command(&self, description: &str, verbose: bool) -> Result<String> {
         let api_key = std::env::var("OPENAI_API_KEY")
             .context("OPENAI_API_KEY environment variable not set")?;
 
@@ -78,6 +78,14 @@ impl CommandGenerator for OpenAiApi {
                 },
             ],
         };
+
+        if verbose {
+            if let Ok(json) = serde_json::to_string_pretty(&request) {
+                eprintln!("--- Request body ---");
+                eprintln!("{json}");
+                eprintln!("--------------------");
+            }
+        }
 
         let client = reqwest::Client::new();
         let response = client

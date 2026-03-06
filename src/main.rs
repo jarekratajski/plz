@@ -25,13 +25,18 @@ CONFIGURATION:
      Get a key at: https://platform.openai.com/api-keys
        export OPENAI_API_KEY=\"sk-...\"
 
+  4. GitHub Copilot Enterprise
+     Requires a GitHub token with Copilot Enterprise access:
+       export GITHUB_TOKEN=\"ghp_...\"
+
   Add exports to ~/.bashrc or ~/.zshrc for persistence.
   The first available backend is used; others serve as fallbacks.
 
   Use --vendor <NAME> to force a specific backend:
     --vendor claude-cli   Claude CLI subprocess
     --vendor claude       Claude HTTP API
-    --vendor chatgpt      OpenAI HTTP API"
+    --vendor chatgpt      OpenAI HTTP API
+    --vendor copilot      GitHub Copilot Enterprise"
 )]
 struct Args {
     /// Safe mode: only safe commands can run
@@ -47,7 +52,7 @@ struct Args {
     verbose: bool,
 
     /// Force a specific vendor instead of auto-detection
-    #[arg(long = "vendor", value_parser = ["claude-cli", "claude", "chatgpt"])]
+    #[arg(long = "vendor", value_parser = ["claude-cli", "claude", "chatgpt", "copilot"])]
     vendor: Option<String>,
 
     /// Natural language description of what to do
@@ -229,24 +234,7 @@ fn classify_risk(command: &str) -> RiskAssessment {
         };
     }
 
-    if contains_any(
-        &command_lower,
-        &[
-            "cat ",
-            "ls ",
-            "find ",
-            "grep ",
-            "head ",
-            "tail ",
-            "wc ",
-            "echo ",
-            "touch ",
-            "mkdir ",
-            "cp ",
-            "mv ",
-            "git ",
-        ],
-    ) {
+    if is_safe_read_command(&command_lower) {
         return RiskAssessment {
             level: RiskLevel::Safe,
             reason: "read or common local file operation",
@@ -257,6 +245,19 @@ fn classify_risk(command: &str) -> RiskAssessment {
         level: RiskLevel::Moderate,
         reason: "unknown command pattern (conservative default)",
     }
+}
+
+const SAFE_COMMANDS: &[&str] = &[
+    "cat", "ls", "dir", "tree", "find", "grep", "head", "tail",
+    "wc", "echo", "touch", "mkdir", "cp", "mv", "stat", "file", "git",
+];
+
+fn is_safe_read_command(command: &str) -> bool {
+    SAFE_COMMANDS.iter().any(|cmd| {
+        command == *cmd
+            || command.starts_with(&format!("{cmd} "))
+            || command.starts_with(&format!("{cmd}\n"))
+    })
 }
 
 fn contains_any(text: &str, needles: &[&str]) -> bool {
@@ -430,5 +431,20 @@ mod tests {
 
         let dangerous = classify_risk("sudo rm -rf /tmp/some_dir");
         assert_eq!(dangerous.level, RiskLevel::Dangerous);
+    }
+
+    #[test]
+    fn test_folder_listing_commands_are_safe() {
+        // Bare commands (no arguments)
+        assert_eq!(classify_risk("ls").level, RiskLevel::Safe);
+        assert_eq!(classify_risk("dir").level, RiskLevel::Safe);
+        assert_eq!(classify_risk("tree").level, RiskLevel::Safe);
+
+        // With arguments
+        assert_eq!(classify_risk("ls -la /tmp").level, RiskLevel::Safe);
+        assert_eq!(classify_risk("dir /home").level, RiskLevel::Safe);
+        assert_eq!(classify_risk("tree -L 2").level, RiskLevel::Safe);
+        assert_eq!(classify_risk("stat somefile.txt").level, RiskLevel::Safe);
+        assert_eq!(classify_risk("file image.png").level, RiskLevel::Safe);
     }
 }

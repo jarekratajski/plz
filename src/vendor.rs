@@ -14,7 +14,7 @@ pub trait CommandGenerator: Send + Sync {
     fn name(&self) -> &str;
     fn vendor_id(&self) -> &str;
     fn is_available(&self) -> bool;
-    fn generate_command(&self, description: &str) -> impl std::future::Future<Output = Result<String>> + Send;
+    fn generate_command(&self, description: &str, verbose: bool) -> impl std::future::Future<Output = Result<String>> + Send;
 }
 
 pub fn select_vendors() -> Vec<Box<dyn CommandGeneratorBoxed>> {
@@ -22,6 +22,7 @@ pub fn select_vendors() -> Vec<Box<dyn CommandGeneratorBoxed>> {
         Box::new(crate::vendors::claude_cli::ClaudeCli),
         Box::new(crate::vendors::claude_api::ClaudeApi),
         Box::new(crate::vendors::openai_api::OpenAiApi),
+        Box::new(crate::vendors::copilot_enterprise::CopilotEnterprise),
     ]
 }
 
@@ -30,7 +31,7 @@ pub trait CommandGeneratorBoxed: Send + Sync {
     fn name(&self) -> &str;
     fn vendor_id(&self) -> &str;
     fn is_available(&self) -> bool;
-    fn generate_command_boxed<'a>(&'a self, description: &'a str) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>>;
+    fn generate_command_boxed<'a>(&'a self, description: &'a str, verbose: bool) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>>;
 }
 
 impl<T: CommandGenerator> CommandGeneratorBoxed for T {
@@ -46,8 +47,8 @@ impl<T: CommandGenerator> CommandGeneratorBoxed for T {
         CommandGenerator::is_available(self)
     }
 
-    fn generate_command_boxed<'a>(&'a self, description: &'a str) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>> {
-        Box::pin(CommandGenerator::generate_command(self, description))
+    fn generate_command_boxed<'a>(&'a self, description: &'a str, verbose: bool) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>> {
+        Box::pin(CommandGenerator::generate_command(self, description, verbose))
     }
 }
 
@@ -76,7 +77,7 @@ async fn generate_command_forced(description: &str, verbose: bool, vendor_id: &s
         ));
     }
 
-    vendor.generate_command_boxed(description).await
+    vendor.generate_command_boxed(description, verbose).await
 }
 
 async fn generate_command_with_fallback(description: &str, verbose: bool) -> Result<String> {
@@ -95,7 +96,7 @@ async fn generate_command_with_fallback(description: &str, verbose: bool) -> Res
             eprintln!("Using {}", vendor.name());
         }
 
-        match vendor.generate_command_boxed(description).await {
+        match vendor.generate_command_boxed(description, verbose).await {
             Ok(command) => return Ok(command),
             Err(err) => {
                 if verbose {
@@ -108,8 +109,8 @@ async fn generate_command_with_fallback(description: &str, verbose: bool) -> Res
 
     Err(last_error.unwrap_or_else(|| {
         anyhow::anyhow!(
-            "No AI vendor available. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, \
-             or install the claude CLI. Run plz --help for details."
+            "No AI vendor available. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, \
+             or GITHUB_TOKEN, or install the claude CLI. Run plz --help for details."
         )
     }))
 }

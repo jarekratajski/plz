@@ -28,6 +28,8 @@ if the feature is done there is a report.md file which contains final report (wa
 
 **IMPORTANT:** plan.md is a REQUIRED step for every feature. Always create plan.md before starting implementation. Never skip it.
 
+**IMPORTANT:** Never modify an existing requirement file (req_*.md) that already has a report.md — that requirement is considered done. If new related work is needed, create a new requirement folder and file instead.
+
 
 # Work loop
 

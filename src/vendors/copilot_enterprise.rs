@@ -3,18 +3,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::vendor::{CommandGenerator, SYSTEM_PROMPT};
 
-const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_VERSION: &str = "2023-06-01";
-const MODEL: &str = "claude-opus-4-6";
+const COPILOT_API_URL: &str = "https://api.githubcopilot.com/chat/completions";
+const MODEL: &str = "gpt-4o";
 const MAX_TOKENS: u32 = 1024;
 
-pub struct ClaudeApi;
+pub struct CopilotEnterprise;
 
 #[derive(Serialize)]
 struct Request {
     model: &'static str,
     max_tokens: u32,
-    system: &'static str,
     messages: Vec<Message>,
 }
 
@@ -26,14 +24,17 @@ struct Message {
 
 #[derive(Deserialize)]
 struct Response {
-    content: Vec<ContentBlock>,
+    choices: Vec<Choice>,
 }
 
 #[derive(Deserialize)]
-struct ContentBlock {
-    #[serde(rename = "type")]
-    block_type: String,
-    text: Option<String>,
+struct Choice {
+    message: ChoiceMessage,
+}
+
+#[derive(Deserialize)]
+struct ChoiceMessage {
+    content: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -46,33 +47,39 @@ struct ApiErrorDetail {
     message: String,
 }
 
-impl CommandGenerator for ClaudeApi {
+impl CommandGenerator for CopilotEnterprise {
     fn name(&self) -> &str {
-        "Claude HTTP API"
+        "GitHub Copilot Enterprise"
     }
 
     fn vendor_id(&self) -> &str {
-        "claude"
+        "copilot"
     }
 
     fn is_available(&self) -> bool {
-        std::env::var("ANTHROPIC_API_KEY").is_ok()
+        std::env::var("GITHUB_TOKEN")
+            .map(|v| !v.is_empty())
+            .unwrap_or(false)
     }
 
     async fn generate_command(&self, description: &str, verbose: bool) -> Result<String> {
-        let api_key = std::env::var("ANTHROPIC_API_KEY")
-            .context("ANTHROPIC_API_KEY environment variable not set")?;
+        let token = std::env::var("GITHUB_TOKEN")
+            .context("GITHUB_TOKEN environment variable not set")?;
 
         let request = Request {
             model: MODEL,
             max_tokens: MAX_TOKENS,
-            system: SYSTEM_PROMPT,
-            messages: vec![Message {
-                role: "user".to_string(),
-                content: description.to_string(),
-            }],
+            messages: vec![
+                Message {
+                    role: "system".to_string(),
+                    content: SYSTEM_PROMPT.to_string(),
+                },
+                Message {
+                    role: "user".to_string(),
+                    content: description.to_string(),
+                },
+            ],
         };
-
         if verbose {
             if let Ok(json) = serde_json::to_string_pretty(&request) {
                 eprintln!("--- Request body ---");
@@ -80,17 +87,16 @@ impl CommandGenerator for ClaudeApi {
                 eprintln!("--------------------");
             }
         }
-
         let client = reqwest::Client::new();
         let response = client
-            .post(ANTHROPIC_API_URL)
-            .header("x-api-key", &api_key)
-            .header("anthropic-version", ANTHROPIC_VERSION)
+            .post(COPILOT_API_URL)
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Editor-Version", "plz/1.0.0")
             .header("content-type", "application/json")
             .json(&request)
             .send()
             .await
-            .context("Failed to connect to Claude API")?;
+            .context("Failed to connect to GitHub Copilot API")?;
 
         let status = response.status();
         let body = response.text().await.context("Failed to read API response")?;
@@ -102,18 +108,18 @@ impl CommandGenerator for ClaudeApi {
                         message: body.clone(),
                     },
                 });
-            return Err(anyhow!("Claude API error ({}): {}", status, api_err.error.message));
+            return Err(anyhow!("GitHub Copilot API error ({}): {}", status, api_err.error.message));
         }
 
         let response: Response = serde_json::from_str(&body)
-            .context("Failed to parse Claude API response")?;
+            .context("Failed to parse GitHub Copilot API response")?;
 
         let command = response
-            .content
+            .choices
             .into_iter()
-            .find(|block| block.block_type == "text")
-            .and_then(|block| block.text)
-            .ok_or_else(|| anyhow!("Claude returned no text content"))?;
+            .next()
+            .and_then(|choice| choice.message.content)
+            .ok_or_else(|| anyhow!("GitHub Copilot returned no content"))?;
 
         Ok(command.trim().to_string())
     }
@@ -126,39 +132,42 @@ mod tests {
     #[test]
     fn test_response_parsing() {
         let json = r#"{
-            "content": [
-                {"type": "text", "text": "docker stop $(docker ps -q)"}
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "ls -lt | head -1"
+                    },
+                    "finish_reason": "stop"
+                }
             ],
-            "id": "msg_123",
-            "model": "claude-opus-4-6",
-            "role": "assistant",
-            "stop_reason": "end_turn",
-            "type": "message",
-            "usage": {"input_tokens": 10, "output_tokens": 5}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
         }"#;
 
         let response: Response = serde_json::from_str(json).unwrap();
         let text = response
-            .content
+            .choices
             .into_iter()
-            .find(|b| b.block_type == "text")
-            .and_then(|b| b.text)
+            .next()
+            .and_then(|c| c.message.content)
             .unwrap();
 
-        assert_eq!(text, "docker stop $(docker ps -q)");
+        assert_eq!(text, "ls -lt | head -1");
     }
 
     #[test]
     fn test_error_parsing() {
-        let json = r#"{"error": {"type": "authentication_error", "message": "Invalid API key"}}"#;
+        let json = r#"{"error": {"message": "Bad credentials", "type": "unauthorized", "code": "unauthorized"}}"#;
         let err: ApiError = serde_json::from_str(json).unwrap();
-        assert_eq!(err.error.message, "Invalid API key");
+        assert_eq!(err.error.message, "Bad credentials");
     }
 
     #[test]
     fn test_is_available_depends_on_env() {
-        // Just verify it returns a bool without panicking
-        let vendor = ClaudeApi;
+        let vendor = CopilotEnterprise;
         let _available = vendor.is_available();
     }
 }
