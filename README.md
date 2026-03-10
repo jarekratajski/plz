@@ -23,7 +23,7 @@ Risk: Safe (docker lifecycle command on developer machine)
 ### Build & install
 
 ```bash
-git clone https://github.com/AiMiePlz/plz.git
+git clone https://github.com/jarekratajski/plz.git
 cd plz
 cargo install --path .
 ```
