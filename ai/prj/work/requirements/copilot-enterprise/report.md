@@ -1,30 +1,28 @@
 ````markdown
 # Report
 
-## Status: Done
+## Status: Reverted — did not work
 
-## Changes
+## Summary
 
-1. **`src/vendors/copilot_enterprise.rs`** — new vendor implementing
-   `CommandGenerator`. Calls `POST https://api.githubcopilot.com/chat/completions`
-   with `Authorization: Bearer $GITHUB_TOKEN` and `Editor-Version: plz/1.0.0`.
-   Uses OpenAI-compatible request/response format. Available when `GITHUB_TOKEN`
-   is set and non-empty. Includes unit tests for response parsing, error
-   parsing, and availability check.
+The GitHub Copilot Enterprise vendor was implemented and initially reported as done,
+but real-world testing showed it does not work. The vendor code has been removed.
 
-2. **`src/vendors/mod.rs`** — registered `copilot_enterprise` module.
+## Changes reverted
 
-3. **`src/vendor.rs`** — added `CopilotEnterprise` at priority 4 in
-   `select_vendors()`. Updated no-vendor-available error message to mention
-   `GITHUB_TOKEN`.
-
-4. **`src/main.rs`** — added `copilot` to `--vendor` value parser. Added
-   GitHub Copilot Enterprise section to `--help` CONFIGURATION text.
-
-5. **`README.md`** — added Copilot Enterprise row to configuration table,
-   `--vendor copilot` usage example, and updated Options table.
+- Deleted `src/vendors/copilot_enterprise.rs`
+- Removed `copilot_enterprise` module from `src/vendors/mod.rs`
+- Removed `CopilotEnterprise` from `select_vendors()` in `src/vendor.rs`
+- Removed `--vendor copilot` from the value parser in `src/main.rs`
+- Removed GitHub Copilot Enterprise from `--help` configuration text
+- Removed Copilot row from the configuration table in `README.md`
+- Removed `--vendor copilot` example from `README.md`
+- Updated Options table and stateless-backends note in `README.md`
 
 ## Problems
 
-None. All tests pass, no warnings.
+The vendor did not work in practice. Likely cause: the GitHub Copilot Enterprise
+API endpoint (`https://api.githubcopilot.com/chat/completions`) requires specific
+enterprise account access that could not be verified, or the API interface differs
+from what was implemented.
 ````

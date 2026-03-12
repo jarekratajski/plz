@@ -18,26 +18,26 @@ CONFIGURATION:
      Install from: https://docs.anthropic.com/en/docs/claude-cli
      If 'claude' is in your $PATH it is used automatically.
 
-  2. Claude HTTP API
+  2. GitHub Copilot CLI (no API key needed)
+     Install the gh CLI and the Copilot extension:
+       gh extension install github/gh-copilot
+
+  3. Claude HTTP API
      Get a key at: https://console.anthropic.com/
        export ANTHROPIC_API_KEY=\"sk-ant-...\"
 
-  3. OpenAI (ChatGPT) HTTP API
+  4. OpenAI (ChatGPT) HTTP API
      Get a key at: https://platform.openai.com/api-keys
        export OPENAI_API_KEY=\"sk-...\"
-
-  4. GitHub Copilot Enterprise
-     Requires a GitHub token with Copilot Enterprise access:
-       export GITHUB_TOKEN=\"ghp_...\"
 
   Add exports to ~/.bashrc or ~/.zshrc for persistence.
   The first available backend is used; others serve as fallbacks.
 
   Use --vendor <NAME> to force a specific backend:
     --vendor claude-cli   Claude CLI subprocess
+    --vendor copilot-cli  GitHub Copilot CLI
     --vendor claude       Claude HTTP API
     --vendor chatgpt      OpenAI HTTP API
-    --vendor copilot      GitHub Copilot Enterprise
 
 CONVERSATION HISTORY:
   When using Claude CLI, plz maintains conversation history so follow-up
@@ -59,7 +59,7 @@ struct Args {
     verbose: bool,
 
     /// Force a specific vendor instead of auto-detection
-    #[arg(long = "vendor", value_parser = ["claude-cli", "claude", "chatgpt", "copilot"])]
+    #[arg(long = "vendor", value_parser = ["claude-cli", "copilot-cli", "claude", "chatgpt"])]
     vendor: Option<String>,
 
     /// Disable conversation history for this invocation (Claude CLI only)

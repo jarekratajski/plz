@@ -20,9 +20,9 @@ pub trait CommandGenerator: Send + Sync {
 pub fn select_vendors() -> Vec<Box<dyn CommandGeneratorBoxed>> {
     vec![
         Box::new(crate::vendors::claude_cli::ClaudeCli),
+        Box::new(crate::vendors::copilot_cli::CopilotCli),
         Box::new(crate::vendors::claude_api::ClaudeApi),
         Box::new(crate::vendors::openai_api::OpenAiApi),
-        Box::new(crate::vendors::copilot_enterprise::CopilotEnterprise),
     ]
 }
 
@@ -109,8 +109,8 @@ async fn generate_command_with_fallback(description: &str, verbose: bool, no_con
 
     Err(last_error.unwrap_or_else(|| {
         anyhow::anyhow!(
-            "No AI vendor available. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, \
-             or GITHUB_TOKEN, or install the claude CLI. Run plz --help for details."
+            "No AI vendor available. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, \
+             or install the claude CLI. Run plz --help for details."
         )
     }))
 }

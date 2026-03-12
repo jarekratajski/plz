@@ -41,9 +41,9 @@ plz --help
 | Priority | Backend | How to enable |
 |----------|---------|---------------|
 | 1 | Claude CLI | Install from [docs.anthropic.com](https://docs.anthropic.com/en/docs/claude-cli). If `claude` is in your `$PATH`, it is used automatically. No API key needed. |
-| 2 | Claude HTTP API | `export ANTHROPIC_API_KEY="sk-ant-..."` — get a key at [console.anthropic.com](https://console.anthropic.com/) |
-| 3 | OpenAI (ChatGPT) HTTP API | `export OPENAI_API_KEY="sk-..."` — get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
-| 4 | GitHub Copilot Enterprise | `export GITHUB_TOKEN="ghp_..."` — requires a GitHub token with Copilot Enterprise access |
+| 2 | GitHub Copilot CLI | Install `gh` and run `gh extension install github/gh-copilot`. No API key needed. |
+| 3 | Claude HTTP API | `export ANTHROPIC_API_KEY="sk-ant-..."` — get a key at [console.anthropic.com](https://console.anthropic.com/) |
+| 4 | OpenAI (ChatGPT) HTTP API | `export OPENAI_API_KEY="sk-..."` — get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 
 Add the `export` to `~/.bashrc` or `~/.zshrc` for persistence.
 
@@ -51,9 +51,9 @@ The first available backend is used. To force a specific one:
 
 ```bash
 plz --vendor claude-cli list files
+plz --vendor copilot-cli list files
 plz --vendor claude list files
 plz --vendor chatgpt list files
-plz --vendor copilot list files
 ```
 
 ## Usage
@@ -79,7 +79,7 @@ plz compress this folder into a tar.gz
 | `-s` | **Safe mode** — only Safe commands run; everything else is rejected |
 | `-f` | **Force mode** — Safe and Moderate commands run automatically; Dangerous asks for confirmation |
 | `-v`, `--verbose` | Print which AI backend is being used and other diagnostics |
-| `--vendor <NAME>` | Force a specific backend: `claude-cli`, `claude`, `chatgpt`, or `copilot` |
+| `--vendor <NAME>` | Force a specific backend: `claude-cli`, `copilot-cli`, `claude`, or `chatgpt` |
 | `-n`, `--no-context` | Disable conversation history for this invocation (Claude CLI only) |
 | `-h`, `--help` | Show help with configuration instructions |
 
@@ -104,7 +104,7 @@ plz -n list files
 ```
 
 Conversation history is only available with Claude CLI. Other backends
-(Claude API, OpenAI, Copilot Enterprise) operate statelessly.
+(GitHub Copilot CLI, Claude API, OpenAI) operate statelessly.
 
 ## Safety system
 
